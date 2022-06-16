@@ -9,11 +9,12 @@ from collections import Counter
 import pandas as pd
 import pysam
 
-parser = argparse.ArgumentParser(description='Process some integers.')
+parser = argparse.ArgumentParser(description='Process a fasta file for stats about the genome and C nucleotide. Add a GFF file for further analysis. You can add a nucleotide and the annotations you want.')
 parser.add_argument('-f', '--fasta', type=Path, help='load fasta file')
 parser.add_argument('-g', '--gff', type=Path, help='load gff file')
 parser.add_argument('-n', '--nucleotide', default="C", type=str, help='give a nucleotide to get stats for')
-parser.add_argument('-a', '--annotation', default="gene", type=str, help='give annotations to')
+parser.add_argument('-a', '--annotation', default="gene", type=str, help='give the annotations from the gff files you want to study')
+parser.add_argument("-d", "--debug", dest="loglevel", help="For debugging and speed only. Use only a small part of the bam.", action="store_const", const=logging.DEBUG, default=logging.INFO)
 args = parser.parse_args()
 
 def getGenomeStats(fasta, outfile, nucleotide):
@@ -43,7 +44,6 @@ def getNucleotidePosition (fasta,outfile, nucleotide):
     with open(outfile, mode = "w") as out:
         for seq_ref in SeqIO.parse(fasta,"fasta"):
             for index, nucl in tqdm(enumerate(seq_ref, start = 1)):
-                logging.debug(index, nucl)
                 if nucl == nucleotide:
                     print(seq_ref.id, index, file = out, sep="\t")
     logging.info('getNucleotidePosition finished')
@@ -115,11 +115,12 @@ def getGeneComposition(fasta, gff, out, out2):
         #print(gene.readlines())
             listetotal=[]
             nbrenucleotides={}
-            print('Chr','Pos_Locale', 'Pos_Globale','ID','Taille','Contexte',sep='\t', file=outfile)
+            print('Chr','Pos_Locale', 'Pos_Globale','ID','Taille','Contexte',sep='\t', file=outfile) #header
             for line in gff.readlines():
+                if line.startswith('#'):
+                    continue
                 type, id, chr, strand, start, end = line.strip().split("\t")
                 genesequence=genome[chr][int(start):int(end)]
-                logging.debug(chr, genesequence)
                 genesequencecont=genome[chr][int(start):int(end)+2]
                 nbrenucleotides=Counter(genesequence) #fait un dico de la sequence
                 list_C_relative = GetCPos(genesequence) #obtient la position des C relatifs aux elements
@@ -131,7 +132,6 @@ def getGeneComposition(fasta, gff, out, out2):
                     print(chr, index_listC, index_list_G, id, taille, contexte, sep='\t', file=outfile) 
                 liste=[type, id, chr, strand, start, end,nbrenucleotides['A'], nbrenucleotides['G'], nbrenucleotides['T'],nbrenucleotides['C'], taille, nbrenucleotides['C']/taille*100 ]
                 listetotal.append(liste)
-            logging.debug(listetotal)
             tab=pd.DataFrame(listetotal, columns=['Annotation','ID','Chromosome', 'Brin','Start','End','Nbre_A', 'Nbre_G','Nbre_T','Nbre_C','Taille','Pourcentage_de_C'])
             logging.debug(tab)
             tab.sort_values(by=['Pourcentage_de_C'], ascending=False, inplace=True)
@@ -146,10 +146,10 @@ def getAnalyseRef(fasta=args.fasta, nucleotide=args.nucleotide, annotation=args.
         logging.warning('Please load a gff file if you want a complete analysis.')
     else :
         getGff(gff, "GffTraite.txt", annotation)
-        getGeneComposition(fasta, gff,"RefPosC.txt", "Infos.txt")
+        getGeneComposition(fasta,"GffTraite.txt" ,"RefPosC.txt", "Infos.txt")
 
 def check_args(args):
-    if not args.fasta.exists():
+    if args.fasta and not args.fasta.exists():
         logging.warning("Fasta input does not exist. Please give a valid file.")   
         exit()
     if args.gff and not args.gff.exists():
@@ -158,12 +158,10 @@ def check_args(args):
 
 
 if __name__ == '__main__':
-
     check_args(args)
-    
-    logging.basicConfig(filename='myapppos.log', format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S', level=logging.DEBUG)
+
+    logging.basicConfig(filename='myapppos.log', filemode='w', format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S', level=args.loglevel)
     logging.info('Started')
-    
     getAnalyseRef(fasta=args.fasta, nucleotide=args.nucleotide, annotation=args.annotation, gff=args.gff)
     logging.info('Finished')
  
