@@ -2,6 +2,7 @@ import argparse
 from importlib.resources import path
 import logging
 from pathlib import Path
+import subprocess
 from Bio import SeqIO
 import numpy as np
 from sympy import re
@@ -9,6 +10,7 @@ from tqdm import tqdm
 import math
 from collections import Counter
 import pandas as pd
+import os
 import pysam
 tqdm.pandas()
 
@@ -23,6 +25,7 @@ parser.add_argument("-d", "--debug", dest="loglevel", help="For debugging in log
 
 args = parser.parse_args()
 
+#faire decorateur
 
 def transfoContext(row):
     #https://stackoverflow.com/questions/26886653/pandas-create-new-column-based-on-values-from-other-columns-apply-a-function-o
@@ -33,7 +36,9 @@ def transfoContext(row):
     else : return 'CHH'
 
 def GetBed(infile,outfile):
-    res = pd.read_csv(infile, sep = "\t", usecols=[0,1,5,9,10], header=0, names=['Chr','Pos','Brin','Couverture','Pourcentage_de_methylation'])
+    nrow, _ = subprocess.check_output(["wc", "-l", str(infile)]).decode().split()
+    logging.info("total rows: "+nrow)
+    res = pd.concat([chunk for chunk in tqdm(pd.read_csv(infile, sep = "\t", usecols=[0,1,5,9,10], header=0, names=['Chr','Pos','Brin','Couverture','Pourcentage_de_methylation'], chunksize=5000), desc='Loading Bismark data', total=int(nrow)/5000)])
     res['Reads_methyles']= round(res['Pourcentage_de_methylation'] * res['Couverture']/100)
     res['Reads_non_methyles']= round(res['Couverture']-res['Reads_methyles'])
     res['Contexte']='CG'
@@ -42,7 +47,9 @@ def GetBed(infile,outfile):
 
 def getBathMet2(infile,outfile):
     # bathmet :#chromsome	loci	strand	context	C_count	CT_count	methRatio	eff_CT_count	rev_G_count	rev_GA_count	MethContext	5context
-    res = pd.read_csv(infile, sep = "\t", usecols=[0,1,2,3,4,5,6], header=0, names=['Chr','Pos_Globale','Brin','Contexte','Reads_methyles','Reads_non_methyles','Ratio_de_meth'])
+    nrow, _ = subprocess.check_output(["wc", "-l", str(infile)]).decode().split()
+    logging.info("total rows: "+nrow)
+    res = pd.concat([chunk for chunk in tqdm(pd.read_csv(infile, sep = "\t", usecols=[0,1,2,3,4,5,6], header=0, names=['Chr','Pos_Globale','Brin','Contexte','Reads_methyles','Reads_non_methyles','Ratio_de_meth'], chunksize=5000), desc='Loading Bathmet2 data', total=int(nrow)/5000)])
     res['Couverture']= res['Reads_methyles'] + res['Reads_non_methyles'] 
     res['Pourcentage_de_methylation']= round(res ['Reads_methyles'] / res['Couverture']*100, ndigits=2)
     res = res.fillna(np.NaN) # car vide si division par 0
@@ -50,14 +57,20 @@ def getBathMet2(infile,outfile):
 
 def getBismark(infile, outfile):
     # bismark : "chr", "pos", "strand", "methylated", "unmethylated", "context", "trinucleotide"
-    res = pd.read_csv(infile, sep = "\t", usecols=[0,1,2,3,4,5], header=0, names=['Chr','Pos_Globale','Brin','Reads_methyles','Reads_non_methyles','Contexte'])
+    nrow, _ = subprocess.check_output(["wc", "-l", str(infile)]).decode().split()
+    logging.info("total rows: "+nrow)
+    res = pd.concat([chunk for chunk in tqdm(pd.read_csv(infile, sep = "\t", usecols=[0,1,2,3,4,5], header=0, names=['Chr','Pos_Globale','Brin','Reads_methyles','Reads_non_methyles','Contexte'], chunksize=5000), desc='Loading Bismark data', total=int(nrow)/5000)])
+    #res = pd.read_csv(infile, sep = "\t", usecols=[0,1,2,3,4,5], header=0, names=['Chr','Pos_Globale','Brin','Reads_methyles','Reads_non_methyles','Contexte'])
     res['Couverture']= res['Reads_methyles'] + res['Reads_non_methyles'] 
     res['Pourcentage_de_methylation']= round(res ['Reads_methyles'] / res['Couverture']*100, ndigits=2)
     res = res.fillna(np.NaN)
+    logging.info('Bismark traite saved in',outfile)
     return res.iloc[:, [0,1,2,3,4,7,6,5]].to_csv(outfile, sep='\t')
 
 def getDeepSignal(infile, outfile):
-    res = pd.read_csv(infile, sep = "\t", usecols=[0,1,2,6,7,8,10], header=0, names=['Chr','Pos','Brin','Reads_methyles','Reads_non_methyles','Couverture','Contexte2'])
+    nrow, _ = subprocess.check_output(["wc", "-l", str(infile)]).decode().split()
+    logging.info("total rows: "+nrow)
+    res = pd.concat([chunk for chunk in tqdm(pd.read_csv(infile, sep = "\t", usecols=[0,1,2,6,7,8,10], header=0, names=['Chr','Pos','Brin','Reads_methyles','Reads_non_methyles','Couverture','Contexte2'], chunksize=5000), desc='Loading DeepSignal data', total=int(nrow)/5000)])
     res['Pourcentage_de_methylation']= round(res ['Reads_methyles'] / res['Couverture']*100, ndigits=2)
     res['Contexte']= res.progress_apply(lambda row: transfoContext(row), axis=1)
     res['Pos_Globale']= res['Pos']+1 #car pas même base
@@ -66,9 +79,14 @@ def getDeepSignal(infile, outfile):
 
 
 def getMerged(infile1, infile2, outfile):
-    ref = pd.read_csv(infile1, sep='\t', dtype={'Pos_Globale': str})
-    autre = pd.read_csv(infile2, index_col=0, sep='\t', dtype={'Pos_Globale': str})
+    nrow, _ = subprocess.check_output(["wc", "-l", str(infile1)]).decode().split()
+    logging.info("total rows of the reference: "+nrow)
+    ref = pd.concat([chunk for chunk in tqdm(pd.read_csv(infile1, sep='\t', dtype={'Pos_Globale': str}, chunksize=5000), desc='Loading reference data', total=int(nrow)/5000)])
+    nrow2, _ = subprocess.check_output(["wc", "-l", str(infile2)]).decode().split()
+    logging.info("total rows of the sequencing file: "+nrow2)
+    autre = pd.concat([chunk for chunk in tqdm(pd.read_csv(infile2, index_col=0, sep='\t', dtype={'Pos_Globale': str}, chunksize=5000), desc='Loading sequencing file data', total=int(nrow)/5000)])
     a=ref.merge(autre, how='left', on=['Chr','Contexte','Pos_Globale'])
+    logging.info('Merged file saving in',outfile)
     a.to_csv(outfile, sep='\t',index=False)
 
 def getMergedPourcentage(infileref,infile2,outfile):  
@@ -76,7 +94,6 @@ def getMergedPourcentage(infileref,infile2,outfile):
     autre= pd.read_csv(infile2, sep='\t', usecols=['Chr','Pos_Globale','ID','Pourcentage_de_methylation'])
     a=ref.merge(autre, how='left', on=['Chr','Pos_Globale','ID'])
     a.to_csv(outfile, sep='\t', index=False)
-
 
 
 def analyseBathMet2(input, ref):
@@ -135,3 +152,4 @@ if __name__ == '__main__':
         logging.info('Starting Deep Signal Plant processing')
         analyseDeepSignalPlant(args.deepsignalplant, args.reference)
         logging.info('Finished Deep Signal Plant processing')
+
