@@ -1,0 +1,238 @@
+---
+title: "Rapport_Analyse_Methylation"
+author: "Solène MEDINA"
+date: '2022-06-21'
+output: rmdformats::downcute
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, echo = TRUE, warning = FALSE, message = FALSE, dev = "png", dpi = 300)
+
+library(data.table)
+library(ggplot2)
+library(ggpubr)
+library(stringr)
+
+DSTranspos = fread("/Users/smedina/Desktop/Stage/DSMergedTranspos.txt")
+BismarkTranspos = fread("/Users/smedina/Desktop/Stage/BismarkMergedTranspos.txt")
+listeT=list(DSTranspos,BismarkTranspos)
+names(listeT)=c("DeepSignalPlant","Bismark")
+tab = rbindlist(listeT, idcol = 'Type', fill=TRUE, use.names=TRUE)
+
+
+plotCorreDSBmparCont <- function(filelist) {
+  missing_contexte = nrow(tab[Contexte == ""])
+  warning("Missing contexte in ", missing_contexte)
+  tab[Contexte == "", Contexte := 'CHH']
+  aT = tab[, list("%m"=mean(Pourcentage_de_methylation, na.rm  = T)), by = c('Type', 'ID', 'Chr', "Contexte")]
+  bT = dcast(aT, Chr+ID+Contexte ~ Type)
+  bT[, Annotation := "TE"]
+  bT[str_detect(ID, "G"), Annotation := "Gene"]
+  table(bT$Contexte)
+  DSTranspos[Contexte == ""]
+  table(bT$Annotation)
+  
+  plotT <- ggplot(bT, aes(x = Bismark, y = DeepSignalPlant )) + geom_point(alpha = 0.2) + 
+    geom_smooth(col ='deeppink')+ 
+    stat_cor(p.accuracy = 0.001, r.accuracy = 0.01) + facet_grid(Contexte~Annotation)+
+    labs(title="Diagramme de corrélation", 
+         subtitle="DeepSignalPlant / Bismark par élément et contexte de cytosine")
+  return (plotT)
+}
+
+barPlotparGene <- function(filelist, geneid, debug = F){
+  missing_contexte = nrow(tab[Contexte == ""])
+  warning("Missing contexte in ", missing_contexte)
+  tab[Contexte == "", Contexte := 'CHH']
+  sub <- tab[ID %in% geneid, c("ID","Pourcentage_de_methylation","Contexte","Pos_Locale","Type", "Couverture")]
+  subNA <- sub[is.na(Pourcentage_de_methylation) ]
+  if (debug){
+    print(tab)
+    print(sub)
+    print(subNA)
+    }
+  A <- ggplot(sub, aes(x=Pos_Locale, y=Pourcentage_de_methylation)) +
+    geom_bar(aes(fill = Contexte), stat="identity",position=position_dodge()) + theme_bw() +
+    labs(x = "Position locale", y = "% methylation") + geom_line(aes(y = Couverture), size = 0.1) + 
+    geom_point(aes(x = Pos_Locale, y = -10,color = "Cytosine"), size = 0.2) + coord_cartesian(ylim = c(-11, 100))
+  # if NA in table
+  if (nrow(subNA) > 0) {
+    A <- A + geom_col(data = subNA, aes(Pos_Locale, y = 100), width = 0.3, fill = "grey") +
+      geom_point(data = subNA, aes(Pos_Locale, y = -5, color = "Pas de couverture"), width = 3,  size = 0.2, alpha = 0.5) +
+      scale_color_manual(values = c("Pas de couverture" = "black", "Cytosine"="#B47FAF"))
+    }
+  # if multiple genes
+  if(length(geneid) > 1) {
+    A <- A + facet_wrap(ID ~ Type, ncol = length(filelist), scales = "free")
+  } else {
+    A <- A + facet_wrap(~Type, ncol = 1, scales = "free_x") +scale_color_manual(values = c("Cytosine"="orange"))
+  } 
+  A <- A + labs(color = "Position")
+  A
+}
+
+getProfile <- function(filelist, geneid){
+  missing_contexte = nrow(tab[Contexte == ""])
+  warning("Missing contexte : ", missing_contexte)
+  tab[Contexte == "", Contexte := 'CHH']
+  sub <- tab[ID %in% geneid, c("ID","Pourcentage_de_methylation","Contexte","Pos_Locale","Type", "Couverture")]
+  p <- ggplot(sub, aes(x=Contexte, y=Pourcentage_de_methylation, color=Contexte)) + theme_bw() +
+    labs(title="BoxPlot de la méthylation par contexte", subtitle = unique(sub$ID), y = "% methylation") +
+    geom_boxplot(outlier.colour="grey", outlier.shape=8, outlier.size=2) +
+    stat_summary(fun=mean, geom="point", shape=13, size=4) + ylim(c(0,100))
+  return (p)
+}
+
+```
+
+# Introduction
+
+This document is a report of what I did in the R language during my internship in 2022.
+
+# Boxplots
+
+First, here are some boxplots about the methylation and the context of the cytosines of an annotation.
+
+```{r boxplot, echo=FALSE, warning=FALSE, message=FALSE}
+plot (getProfile(listeT,"AT1G40090"))
+
+```
+
+Here is the code:
+
+```{r, eval=FALSE}
+getProfile <- function(filelist, geneid){
+  tab <- rbindlist(filelist, idcol = 'Type', fill=TRUE, use.names=TRUE)
+  missing_contexte = nrow(tab[Contexte == ""])
+  warning("Missing contexte : ", missing_contexte)
+  tab[Contexte == "", Contexte := 'CHH']
+  sub <- tab[ID %in% geneid, c("ID","Pourcentage_de_methylation","Contexte","Pos_Locale","Type", "Couverture")]
+  p <- ggplot(sub, aes(x=Contexte, y=Pourcentage_de_methylation, color=Contexte)) + theme_bw() +
+    labs(title="BoxPlot de la méthylation par contexte", subtitle = unique(sub$ID), y = "% methylation") +
+    geom_boxplot(outlier.colour="grey", outlier.shape=8, outlier.size=2) +
+    stat_summary(fun=mean, geom="point", shape=13, size=4) + ylim(c(0,100))
+  return (p)
+}
+
+```
+
+
+# Scatterplot
+
+I made this plot to see how close the data of two different sequencing methods are.
+
+```{r correplot, echo=FALSE, warning=FALSE, message=FALSE}
+plot (plotCorreDSBmparCont(listeT))
+
+```
+
+We can see that they are **all very correlated**, even though the CHH Context is slightly less.
+
+Here is the code for this plot :
+
+
+```{r correcode, eval=FALSE}
+plotCorreDSBmparCont <- function(filelist) {
+  tabT <- rbindlist(filelist, idcol = 'Type', fill=TRUE, use.names=TRUE)
+  missing_contexte = nrow(tabT[Contexte == ""])
+  warning("Missing contexte in ", missing_contexte)
+  tabT[Contexte == "", Contexte := 'CHH']
+  aT = tabT[, list("%m"=mean(Pourcentage_de_methylation, na.rm  = T)), by = c('Type', 'ID', 'Chr', "Contexte")]
+  bT = dcast(aT, Chr+ID+Contexte ~ Type)
+  bT[, Annotation := "TE"]
+  bT[str_detect(ID, "G"), Annotation := "Gene"]
+  table(bT$Contexte)
+  DSTranspos[Contexte == ""]
+  table(bT$Annotation)
+  
+  plotT <- ggplot(bT, aes(x = Bismark, y = DeepSignalPlant )) + geom_point(alpha = 0.2) + 
+    geom_smooth(col ='deeppink')+ 
+    stat_cor(p.accuracy = 0.001, r.accuracy = 0.01) + facet_grid(Contexte~Annotation)+
+    labs(title="Diagramme de corrélation", 
+         subtitle="DeepSignalPlant / Bismark par élément et contexte de cytosine")
+  return (plotT)
+}
+
+```
+
+# Barplot 
+
+Now here is the most important plot that hold the most information about the coverage and the methylation of each annotation.
+
+```{r barplot, echo=FALSE, warning=FALSE, message=FALSE}
+barPlotparGene(filelist = listeT, c("AT1G01010", "AT1G38065", "AT5TE75660"))
+
+```
+
+We can see with bars how methylated each cytosine of a single gene/other annotation is and its context with the color of the bar, this color being grey when we do not get the rate of methylation information. The coverage of the whole annotation is displayed by the black line. The positions of the cytosines are displayed by the purple dots and the black dots show the cytosines not covered.
+
+Here is the code:
+
+```{r barplotcode, eval=FALSE}
+barPlotparGene <- function(filelist, geneid, debug = F){
+  tab <- rbindlist(filelist, idcol = 'Type', fill=TRUE, use.names=TRUE)
+  missing_contexte = nrow(tab[Contexte == ""])
+  warning("Missing contexte in ", missing_contexte)
+  tab[Contexte == "", Contexte := 'CHH']
+  sub <- tab[ID %in% geneid, c("ID","Pourcentage_de_methylation","Contexte","Pos_Locale","Type", "Couverture")]
+  subNA <- sub[is.na(Pourcentage_de_methylation) ]
+  if (debug){
+    print(tab)
+    print(sub)
+    print(subNA)
+    }
+  A <- ggplot(sub, aes(x=Pos_Locale, y=Pourcentage_de_methylation)) +
+    geom_bar(aes(fill = Contexte), stat="identity",position=position_dodge()) + theme_bw() +
+    labs(x = "Position locale", y = "% methylation") + geom_line(aes(y = Couverture), size = 0.1) + 
+    geom_point(aes(x = Pos_Locale, y = -10,color = "Cytosine"), size = 0.2) + coord_cartesian(ylim = c(-11, 100))
+  # if NA in table
+  if (nrow(subNA) > 0) {
+    A <- A + geom_col(data = subNA, aes(Pos_Locale, y = 100), width = 0.3, fill = "grey") +
+      geom_point(data = subNA, aes(Pos_Locale, y = -5, color = "Pas de couverture"), width = 3,  size = 0.2, alpha = 0.5) +
+      scale_color_manual(values = c("Pas de couverture" = "black", "Cytosine"="#B47FAF"))
+    }
+  # if multiple genes
+  if(length(geneid) > 1) {
+    A <- A + facet_wrap(ID ~ Type, ncol = length(filelist), scales = "free")
+  } else {
+    A <- A + facet_wrap(~Type, ncol = 1, scales = "free_x") +scale_color_manual(values = c("Cytosine"="orange"))
+  } 
+  A <- A + labs(color = "Position")
+  A
+}
+
+```
+
+
+# Informative tables
+
+Here are some tables I made to show that the methylation rate isn't always accurate/useful.
+First here is the code :
+
+```{r tabcode}
+sub = tab[, list("Total_cytosine"=.N), by = c('Type', 'ID', 'Chr')] #list permet de nommer la colonne
+missing = tab[is.na(Couverture) | Couverture == 0, list("Missing_cytosine" = .N), by = c('Type', 'ID')]
+joined_dt <- merge(sub, missing, by = c("Type", 'ID'),all.x = TRUE)
+joined_dt[is.na(Missing_cytosine), Missing_cytosine := 0]
+joined_dt[, Missing_perc := Missing_cytosine / Total_cytosine *100]
+
+tricytos <- setorder(joined_dt, Total_cytosine)
+tripercmissing <- setorder(joined_dt, -Missing_perc, -Missing_cytosine)
+```
+
+And here are the tables : the first one shows some annotations with very few cytosines :
+
+```{r tab, echo=FALSE, cache=FALSE}
+tricytos <- setorder(joined_dt, Total_cytosine)
+head(tricytos)
+
+```
+
+The second one shows annotations where there is a lot of cytosines missing in the read :
+```{r tab2, echo=FALSE, cache=FALSE}
+tripercmissing <- setorder(joined_dt, -Missing_perc, -Missing_cytosine)
+head(tripercmissing)
+```
+
+
+
