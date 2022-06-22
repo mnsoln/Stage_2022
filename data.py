@@ -25,7 +25,13 @@ parser.add_argument("-d", "--debug", dest="loglevel", help="For debugging in log
 
 args = parser.parse_args()
 
-#faire decorateur
+#decorateur
+def print_info(func):
+    def decorateur(*args):
+            logging.info('Starting ' + func.__name__+' processing')
+            func(*args)
+            logging.info('Finished ' + func.__name__+' processing')
+    return decorateur
 
 def transfoContext(row):
     #https://stackoverflow.com/questions/26886653/pandas-create-new-column-based-on-values-from-other-columns-apply-a-function-o
@@ -64,8 +70,9 @@ def getBismark(infile, outfile):
     res['Couverture']= res['Reads_methyles'] + res['Reads_non_methyles'] 
     res['Pourcentage_de_methylation']= round(res ['Reads_methyles'] / res['Couverture']*100, ndigits=2)
     res = res.fillna(np.NaN)
-    logging.info('Bismark traite saved in',outfile)
-    return res.iloc[:, [0,1,2,3,4,7,6,5]].to_csv(outfile, sep='\t')
+    logging.info('Bismark traite saving in '+str(outfile))
+    res.iloc[:, [0,1,2,3,4,7,6,5]].to_csv(outfile, sep='\t')
+    logging.info('Bismark traite saved')
 
 def getDeepSignal(infile, outfile):
     nrow, _ = subprocess.check_output(["wc", "-l", str(infile)]).decode().split()
@@ -75,7 +82,9 @@ def getDeepSignal(infile, outfile):
     res['Contexte']= res.progress_apply(lambda row: transfoContext(row), axis=1)
     res['Pos_Globale']= res['Pos']+1 #car pas même base
     res = res.fillna(np.NaN)
+    logging.info('DeepSignal traite saving in '+str(outfile))
     res.iloc[:, [0,9,2,3,4,7,5,8]].to_csv(outfile, sep='\t')
+    logging.info('DeepSignal traite saved')
 
 
 def getMerged(infile1, infile2, outfile):
@@ -86,8 +95,9 @@ def getMerged(infile1, infile2, outfile):
     logging.info("total rows of the sequencing file: "+nrow2)
     autre = pd.concat([chunk for chunk in tqdm(pd.read_csv(infile2, index_col=0, sep='\t', dtype={'Pos_Globale': str}, chunksize=5000), desc='Loading sequencing file data', total=int(nrow)/5000)])
     a=ref.merge(autre, how='left', on=['Chr','Contexte','Pos_Globale'])
-    logging.info('Merged file saving in',outfile)
+    logging.info('Merged file saving in '+str(outfile))
     a.to_csv(outfile, sep='\t',index=False)
+    logging.info('Merged file saved')
 
 def getMergedPourcentage(infileref,infile2,outfile):  
     ref = pd.read_csv(infileref, sep='\t', usecols=['Chr','Pos_Globale','ID'])
@@ -95,19 +105,22 @@ def getMergedPourcentage(infileref,infile2,outfile):
     a=ref.merge(autre, how='left', on=['Chr','Pos_Globale','ID'])
     a.to_csv(outfile, sep='\t', index=False)
 
-
+@print_info
 def analyseBathMet2(input, ref):
-    getBathMet2(input,input.rename(input.stem+"Traite.txt"))
-    getMerged(ref, input.rename(input.stem+"Traite.txt"), input.rename(input.stem+"Merged.txt"))
+    getBathMet2(input,input.parent(input.stem+"Traite.txt"))
+    getMerged(ref, input.parent / (input.stem+"Traite.txt"), input.parent(input.stem+"Merged.txt"))
 
+@print_info
 def analyseBismark(input, ref):
     getBismark(input,input.parent / (input.stem + "Traite.txt"))
     getMerged(ref, input.parent /(input.stem+"Traite.txt"), input.parent /(input.stem+"Merged.txt"))
 
+@print_info
 def analyseBed(input, ref):
     GetBed(input,input.parent /(input.stem+"Traite.txt"))
     getMerged(ref, input.parent /(input.stem+"Traite.txt"), input.parent /(input.stem+"Merged.txt"))
 
+@print_info
 def analyseDeepSignalPlant(input, ref):
     getDeepSignal(input, input.parent /(input.stem+"Traite.txt"))
     getMerged(ref, input.parent /(input.stem+"Traite.txt"), input.parent /(input.stem+"Merged.txt"))
@@ -128,28 +141,21 @@ def check_args(args):
         exit() 
 
 
+
 if __name__ == '__main__':
     check_args(args)
     logging.basicConfig(filename='myappdata.log', filemode='w', format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S', level=args.loglevel)
     logging.info('Started')
 
     if args.bathmet2:
-        logging.info('Starting Bathmet2 processing')
         analyseBathMet2(args.bathmet2, args.reference)
-        logging.info('Finished Bathmet2 processing')
 
     if args.bed:
-        logging.info('Starting Bed processing')
         analyseBed(args.bed, args.reference)
-        logging.info('Finished Bed processing')
 
     if args.bismark:
-        logging.info('Starting Bismark processing')
         analyseBismark(args.bismark, args.reference)
-        logging.info('Finished Bismark processing')
 
     if args.deepsignalplant:
-        logging.info('Starting Deep Signal Plant processing')
         analyseDeepSignalPlant(args.deepsignalplant, args.reference)
-        logging.info('Finished Deep Signal Plant processing')
 
