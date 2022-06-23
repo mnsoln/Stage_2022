@@ -140,7 +140,7 @@ def getGeneComposition(fasta, gff, out, out2):
         
 
 def getAnalyseRef(fasta=args.fasta, nucleotide=args.nucleotide, annotation=args.annotation, gff=args.gff) :
-    getGenomeStats(fasta, nucleotide, 'Stats.txt')
+    getGenomeStats(fasta, 'Stats.txt',nucleotide)
     getNucleotidePosition(fasta, nucleotide+".txt",nucleotide)
     if not gff:
         logging.warning('Please load a gff file if you want a complete analysis.')

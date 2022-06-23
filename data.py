@@ -74,6 +74,21 @@ def getBismark(infile, outfile):
     res.iloc[:, [0,1,2,3,4,7,6,5]].to_csv(outfile, sep='\t')
     logging.info('Bismark traite saved')
 
+def getBismark2(infile, outfile):
+    # bismark : "chr", "pos", "strand", "methylated", "unmethylated", "context", "trinucleotide"
+    nrow, _ = subprocess.check_output(["wc", "-l", str(infile)]).decode().split()
+    logging.info("total rows: "+nrow)
+    res = pd.concat([chunk for chunk in tqdm(pd.read_csv(infile, sep = "\t", usecols=[0,1,2,3,4,5], header=0, names=['Chr','Pos','Brin','Reads_methyles','Reads_non_methyles','Contexte'], chunksize=5000), desc='Loading Bismark data', total=int(nrow)/5000)])
+    #res = pd.read_csv(infile, sep = "\t", usecols=[0,1,2,3,4,5], header=0, names=['Chr','Pos_Globale','Brin','Reads_methyles','Reads_non_methyles','Contexte'])
+    res['Couverture']= res['Reads_methyles'] + res['Reads_non_methyles'] 
+    res['Pourcentage_de_methylation']= round(res ['Reads_methyles'] / res['Couverture']*100, ndigits=2)
+    res['Pos_Globale']= res['Pos']+1 
+    res = res.fillna(np.NaN)
+    logging.info('Bismark traite saving in '+str(outfile))
+    res.iloc[:, [0,8,2,3,4,7,6,5]].to_csv(outfile, sep='\t')
+    logging.info('Bismark traite saved')
+
+
 def getDeepSignal(infile, outfile):
     nrow, _ = subprocess.check_output(["wc", "-l", str(infile)]).decode().split()
     logging.info("total rows: "+nrow)
@@ -146,6 +161,8 @@ if __name__ == '__main__':
     check_args(args)
     logging.basicConfig(filename='myappdata.log', filemode='w', format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S', level=args.loglevel)
     logging.info('Started')
+    getMerged('/Volumes/DATA/GitHub/Stage_2022/ReferencePosC.txt','/Volumes/DATA/GitHub/DptoBmTraite.txt','DPtoBmMerged.txt')
+
 
     if args.bathmet2:
         analyseBathMet2(args.bathmet2, args.reference)
