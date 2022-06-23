@@ -6,27 +6,26 @@ library(stringr)
 BathMet = fread("/Users/smedina/Desktop/Data/MethylationData/BathMet2Merged.txt")
 Bismark = fread("/Users/smedina/Desktop/Data/MethylationData/BismarkMerged.txt")
 DS = fread("/Users/smedina/Desktop/Data/MethylationData/DeepSignalMerged.txt")
-#Bed = fread("/Users/smedina/Desktop/Data/MethylationData/BedMerged.txt")
 liste=list(Bismark,DS,BathMet)
 names(liste)=c( "Bismark", "DeepSignalPlant", "BathMet2")
-tab = rbindlist(liste, idcol = 'Type', fill=TRUE, use.names=TRUE)
+tab = rbindlist(listeT, idcol = 'Type', fill=TRUE, use.names=TRUE)
 
 DSTranspos = fread(DSMerged)
 BismarkTranspos = fread(BmMerged)
-listeT=list(DSTranspos,BismarkTranspos)
-names(listeT)=c("DeepSignalPlant","Bismark")
+
 
 plotCorreDSBmparCont <- function(filelist) {
   tabT <- rbindlist(filelist, idcol = 'Type', fill=TRUE, use.names=TRUE)
   missing_contexte = nrow(tabT[Contexte == ""])
   warning("Missing contexte in ", missing_contexte)
   tabT[Contexte == "", Contexte := 'CHH']
+  #print (tabT[, .N, by = Contexte])
+  print(tabT[Contexte == "CHG" & is.na(Pourcentage_de_methylation), .N])
   aT = tabT[, list("%m"=mean(Pourcentage_de_methylation, na.rm  = T)), by = c('Type', 'ID', 'Chr', "Contexte")]
   bT = dcast(aT, Chr+ID+Contexte ~ Type)
   bT[, Annotation := "TE"]
   bT[str_detect(ID, "G"), Annotation := "Gene"]
   table(bT$Contexte)
-  DSTranspos[Contexte == ""]
   table(bT$Annotation)
   
   plotT <- ggplot(bT, aes(x = Bismark, y = DeepSignalPlant )) + geom_point(alpha = 0.2) + 
@@ -38,9 +37,12 @@ plotCorreDSBmparCont <- function(filelist) {
   }
 
 plotCorreDSBmparCont(listeT)
+plotCorreDSBmparCont(mylistbd)
 
 DSTranspos = fread("/Users/smedina/Desktop/Stage/DSMergedTranspos.txt")
 BismarkTranspos = fread("/Users/smedina/Desktop/Stage/BismarkMergedTranspos.txt")
+listeT=list(DSTranspos,BismarkTranspos)
+names(listeT)=c("DeepSignalPlant","Bismark")
 
 mylist <- list("DSPlant" = DSTranspos, "Bismark" = BismarkTranspos)
 
@@ -80,7 +82,7 @@ barPlotparGene <- function(filelist, geneid, debug = F){
   A
 }
 
-barPlotparGene(filelist = mylist, c("AT1G01010", "AT1G38065"))#, "AT5TE75660"))
+barPlotparGene(filelist = mylist, c("AT1G01010", "AT1G38065", "AT5TE75660"))
 
 getProfile <- function(filelist, geneid){
   tab <- rbindlist(filelist, idcol = 'Type', fill=TRUE, use.names=TRUE)
@@ -91,12 +93,15 @@ getProfile <- function(filelist, geneid){
   p <- ggplot(sub, aes(x=Contexte, y=Pourcentage_de_methylation, color=Contexte)) + theme_bw() +
     labs(title="BoxPlot de la méthylation par contexte", subtitle = unique(sub$ID), y = "% methylation") +
     geom_boxplot(outlier.colour="grey", outlier.shape=8, outlier.size=2) +
-    stat_summary(fun=mean, geom="point", shape=13, size=4)
+    stat_summary(fun=mean, geom="point", shape=13, size=4) + ylim(c(0,100))
   return (p)
 }
+ 
+getProfile(mylist,"AT5G64550")
 
-getProfile(mylist,"AT1G40090")
+barPlotparGene(mylistbd, "BdiBd21-3.1G0000200")
 
+mylistbd <- list("Bismark" = BdBismarkMerged, "DeepSignalPlant" =bddpmerged)
 
 nrow(subNA) #donne  le nombre de lignes d'une dt
 length(subNA) #donne le nombre de colonnes d'une dt
@@ -112,52 +117,14 @@ ggplot(tab[ID == "AT1G38065"], aes(Pos_Locale, Pourcentage_de_methylation, color
 
 
 
-
-    
-p <- ggplot(df3, aes(x=dose, y=len, fill=supp)) + 
-  geom_bar(stat="identity", position=position_dodge()) +
-  geom_errorbar(aes(ymin=len-sd, ymax=len+sd), width=.2,
-                position=position_dodge(.9))
-
-
-
 Test= fread("/Users/smedina/Desktop/Stage/BismarkMTTest.txt")
 DSTranspos[DSTranspos$Contexte==""]
 BismarkTranspos[!BismarkTranspos$Contexte_x == Test$Contexte_y]
 
 
-Bismarktraite[Chr == "Chr5" & Pos_Globale < 15]
-Test[Chr == "Chr5" & Pos_Globale < 15]
-
-
-
-
-b[Contexte == "CG" & DeepSignalPlant >= 50 & Bismark <= 30]
-b[ID == 'AT1G38065']
-
-
-
-#elements avec l + et le - de c
-data <- tab[with(tab,order(-)),]
-
-data <- data[1:10,]
-
-
-
-
-
-
-
-
-sub = tab[, list("Total_cytosine"=.N), by = c('Type', 'ID', 'Chr','Pourcentage_de_methylation')] #list permet de nommer la colonne
+sub = tab[, list("Total_cytosine"=.N), by = c('Type', 'ID', 'Chr')] #list permet de nommer la colonne
 missing = tab[is.na(Couverture) | Couverture == 0, list("Missing_cytosine" = .N), by = c('Type', 'ID')]
 missingloc = tab[is.na(Couverture) | Couverture == 0, list("Missing_cytosine" = .N), by = c('Type', 'ID','Chr','Pourcentage_de_methylation')]
-
-
-ggplot(b, aes(x = Bismark, y = DeepSignalPlant)) + geom_point(alpha = 0.2) + 
-  #geom_smooth(method = lm, se = FALSE)+ 
-  geom_smooth()+ 
-  stat_cor(p.accuracy = 0.001, r.accuracy = 0.01) 
 
 
 c = dcast(missing,ID~Type)
@@ -168,41 +135,30 @@ sub2 = tab[!is.na(Couverture) & Couverture != 0 , list("Total_C_outil"=.N), by =
 sub2[ID=='AT1G38065']
 missing[ID=='AT1G38065']
 
+BdBismarkMerged <- fread("/Volumes/DATA/Bd05_1_val_1_bismark_hisat2_pe.deduplicated.CX_reportMerged.txt")
+bddpmerged <- fread("/Volumes/DATA/GitHub/DPtoBmMerged.txt")
 
-
+bddpmerged[Contexte == "CHG" & !is.na(Pourcentage_de_methylation)]
 #a = tab[, mean(Pourcentage_de_methylation, na.rm = T), by = c("Type", "ID")]#[is.na(V1)]
 
 joined_dt <- merge(sub, missing, by = c("Type", 'ID'),all.x = TRUE)
 joined_dt[is.na(Missing_cytosine), Missing_cytosine := 0]
 joined_dt[, perc := Missing_cytosine / Total_cytosine *100]
-joined_dt[, perc := round(perc, digits = 2)]
-joined_dt
-setorder(joined_dt, -perc)
+#joined_dt[, perc := round(perc, digits = 2)]
+
+tricyto <- setorder(joined_dt, Total_cytosine)
+fwrite(tricyto, file="TableTriC.csv")
+tripercmissing <- setorder(joined_dt, -perc)
+fwrite(tripercmissing, file="TableTriMissing.csv")
+
 
 # Filter
-
-
-mat = dcast(joined_dt, ID ~ Type, value.var = "perc", fun.aggregate = mean)
-
 
 
 dcast.data.table(joined_dt, ID+Chr~Type, value.var = "perc")  #change les données en wide
 dcast.data.table(joined_dt, ID+Chr~Type, value.var = "Missing_cytosine")  #change les données en wide
 dcast.data.table(joined_dt, ID+Chr~Type, value.var = "Total_cytosine")
 
-ggplot(bT, aes(Chr, perc, fill = Contexte)) + geom_boxplot() + facet_wrap(~Type)
-
-
-joined_pos <- merge(sub, missingloc, by = c("Type", 'ID','Pos_Locale','Chr','Pourcentage_de_methylation'),all.x = TRUE)
-joined_pos[is.na(Missing_cytosine), Missing_cytosine := 0]
-ggplot(joined_pos, aes(Pos_Locale,Missing_cytosine, fill = Type)) + geom_count() + facet_wrap(~Chr)
-
-ggplot(joined_pos, aes(Pos_Locale,as.integer(Pourcentage_de_methylation), fill = Type)) + geom_count() + facet_wrap(~Chr)
-
-
-
-joined_dt[ID == "AT1G38065"]
-tab[ID == "AT1G38065" & Type == "Bismark"]
 
 
 
