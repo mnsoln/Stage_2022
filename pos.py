@@ -1,23 +1,30 @@
+# Libraries
+
 import argparse
 import logging
 from pathlib import Path
 from time import asctime
 from Bio import SeqIO
 from tqdm import tqdm
-import math
 from collections import Counter
 import pandas as pd
 import pysam
 
-parser = argparse.ArgumentParser(description='Process a fasta file for stats about the genome and C nucleotide. Add a GFF file for further analysis. You can add a nucleotide and the annotations you want.')
+#Arguments
+
+parser = argparse.ArgumentParser(description='Process a fasta file for stats about the genome and C nucleotide. Add a GFF file for further analysis and to get the reference file you need to use in data.py . You can add the nucleotide you want (this script is cytosine oriented) and the annotations you want.')
 parser.add_argument('-f', '--fasta', type=Path, help='load fasta file')
 parser.add_argument('-g', '--gff', type=Path, help='load gff file')
 parser.add_argument('-n', '--nucleotide', default="C", type=str, help='give a nucleotide to get stats for')
 parser.add_argument('-a', '--annotation', default="gene", type=str, help='give the annotations from the gff files you want to study')
-parser.add_argument("-d", "--debug", dest="loglevel", help="For debugging and speed only. Use only a small part of the bam.", action="store_const", const=logging.DEBUG, default=logging.INFO)
+parser.add_argument("-d", "--debug", dest="loglevel", help="For debugging only.", action="store_const", const=logging.DEBUG, default=logging.INFO)
 args = parser.parse_args()
 
+
+# Data processing functions
+
 def getGenomeStats(fasta, outfile, nucleotide):
+    """ Function that will return a txt file with basic information of your fasta : size of the chromosomes, size of the genome, nucleotides rates."""
     # docu = http://biopython.org/DIST/docs/tutorial/Tutorial.html#sec53 chap 5
     logging.info('Starting getGenomeStats')
     total=0
@@ -40,6 +47,7 @@ def getGenomeStats(fasta, outfile, nucleotide):
     logging.info('getGenomeStats finished')
 
 def getNucleotidePosition (fasta,outfile, nucleotide):
+    """Function that will write the positions of a given nucleotide from a fasta file"""
     logging.info('Starting getNucleotidePosition')
     with open(outfile, mode = "w") as out:
         for seq_ref in SeqIO.parse(fasta,"fasta"):
@@ -49,6 +57,7 @@ def getNucleotidePosition (fasta,outfile, nucleotide):
     logging.info('getNucleotidePosition finished')
 
 def GetCPos(sequence):
+    """"Function that will get the C positions"""
     logging.info('Starting getNucleotidePosition')
     positions=[]
     for index, nucl in tqdm(enumerate(sequence, start = 1)):
@@ -59,6 +68,7 @@ def GetCPos(sequence):
     return positions
     
 def GetCContext(sequence):
+    """Function that will get the C contexts"""
     logging.info('Starting getCContext')
     contextes=[]
     for index, nucl in tqdm(enumerate(sequence, start = 1)):
@@ -85,6 +95,7 @@ def dicoCompoGene(fasta):
     return genome
 
 def getGff(gff, outfile, annotation) :
+    """"Function that will parse the gff file to return a clean file."""
     logging.info('Starting getGff')
     with open (outfile, mode = "w") as out:
         with open(gff) as gff:
@@ -108,17 +119,19 @@ def getGff(gff, outfile, annotation) :
     return f.feature, name, chromosome,strand, start, end
 
 def getGeneComposition(fasta, gff, out, out2):
+    """Function that will give two outfiles : first the reference file of the cytosines of the genome to use in data.py. 
+    Second outfile gives informations on the genome, it adds the number of ATGC and the C rate """
     logging.info('Starting getGeneComposition')
     genome=dicoCompoGene(fasta) 
     with open(gff, mode = "r") as gff:
         with open(out, 'w') as outfile:
-        #print(gene.readlines())
             listetotal=[]
             nbrenucleotides={}
             print('Chr','Pos_Locale', 'Pos_Globale','ID','Taille','Contexte',sep='\t', file=outfile) #header
             for line in gff.readlines():
                 if line.startswith('#'):
                     continue
+                logging.debug(line)
                 type, id, chr, strand, start, end = line.strip().split("\t")
                 genesequence=genome[chr][int(start):int(end)]
                 genesequencecont=genome[chr][int(start):int(end)+2]
@@ -138,6 +151,8 @@ def getGeneComposition(fasta, gff, out, out2):
             tab.to_csv(out2, sep='\t', index=False)
     logging.info('getGeneComposition finished')
         
+
+#Script/pipeline functions
 
 def getAnalyseRef(fasta=args.fasta, nucleotide=args.nucleotide, annotation=args.annotation, gff=args.gff) :
     getGenomeStats(fasta, 'Stats.txt',nucleotide)

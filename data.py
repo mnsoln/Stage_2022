@@ -1,19 +1,15 @@
+#Librairies
+
 import argparse
-from importlib.resources import path
 import logging
 from pathlib import Path
 import subprocess
-from Bio import SeqIO
 import numpy as np
-from sympy import re
 from tqdm import tqdm
-import math
-from collections import Counter
 import pandas as pd
-import os
-import pysam
 tqdm.pandas()
 
+#Arguments
 
 parser = argparse.ArgumentParser(description='Process files.')
 parser.add_argument("-r", "--reference", type = Path)
@@ -25,13 +21,16 @@ parser.add_argument("-d", "--debug", dest="loglevel", help="For debugging in log
 
 args = parser.parse_args()
 
-#decorateur
+#Decorator
 def print_info(func):
     def decorateur(*args):
             logging.info('Starting ' + func.__name__+' processing')
             func(*args)
             logging.info('Finished ' + func.__name__+' processing')
     return decorateur
+
+
+# Data processing functions 
 
 def transfoContext(row):
     #https://stackoverflow.com/questions/26886653/pandas-create-new-column-based-on-values-from-other-columns-apply-a-function-o
@@ -42,6 +41,7 @@ def transfoContext(row):
     else : return 'CHH'
 
 def GetBed(infile,outfile):
+    """ Function that will put your bed file in the right format for merging."""
     nrow, _ = subprocess.check_output(["wc", "-l", str(infile)]).decode().split()
     logging.info("total rows: "+nrow)
     res = pd.concat([chunk for chunk in tqdm(pd.read_csv(infile, sep = "\t", usecols=[0,1,5,9,10], header=0, names=['Chr','Pos','Brin','Couverture','Pourcentage_de_methylation'], chunksize=5000), desc='Loading Bismark data', total=int(nrow)/5000)])
@@ -52,6 +52,7 @@ def GetBed(infile,outfile):
     res.iloc[:, [0,8,2,5,6,4,3,7]].to_csv(outfile, sep='\t', index=False)
 
 def getBathMet2(infile,outfile):
+    """ Function that will put your bathmet2 file in the right format for merging."""
     # bathmet :#chromsome	loci	strand	context	C_count	CT_count	methRatio	eff_CT_count	rev_G_count	rev_GA_count	MethContext	5context
     nrow, _ = subprocess.check_output(["wc", "-l", str(infile)]).decode().split()
     logging.info("total rows: "+nrow)
@@ -62,6 +63,7 @@ def getBathMet2(infile,outfile):
     return res.iloc[:, [0,1,2,4,5,8,7,3]].to_csv(outfile, sep='\t')
 
 def getBismark(infile, outfile):
+    """ Function that will put your bismark file in the right format for merging."""
     # bismark : "chr", "pos", "strand", "methylated", "unmethylated", "context", "trinucleotide"
     nrow, _ = subprocess.check_output(["wc", "-l", str(infile)]).decode().split()
     logging.info("total rows: "+nrow)
@@ -74,7 +76,8 @@ def getBismark(infile, outfile):
     res.iloc[:, [0,1,2,3,4,7,6,5]].to_csv(outfile, sep='\t')
     logging.info('Bismark traite saved')
 
-def getBismark2(infile, outfile):
+def getBismarkfromDS(infile, outfile):
+    """ Function that will put your DeepSignalPlant file converted to bismark file template in the right format for merging."""
     # bismark : "chr", "pos", "strand", "methylated", "unmethylated", "context", "trinucleotide"
     nrow, _ = subprocess.check_output(["wc", "-l", str(infile)]).decode().split()
     logging.info("total rows: "+nrow)
@@ -88,8 +91,8 @@ def getBismark2(infile, outfile):
     res.iloc[:, [0,8,2,3,4,7,6,5]].to_csv(outfile, sep='\t')
     logging.info('Bismark traite saved')
 
-
 def getDeepSignal(infile, outfile):
+    """ Function that will put your DeepSignalPlant file in the right format for merging."""
     nrow, _ = subprocess.check_output(["wc", "-l", str(infile)]).decode().split()
     logging.info("total rows: "+nrow)
     res = pd.concat([chunk for chunk in tqdm(pd.read_csv(infile, sep = "\t", usecols=[0,1,2,6,7,8,10], header=0, names=['Chr','Pos','Brin','Reads_methyles','Reads_non_methyles','Couverture','Contexte2'], chunksize=5000), desc='Loading DeepSignal data', total=int(nrow)/5000)])
@@ -101,8 +104,8 @@ def getDeepSignal(infile, outfile):
     res.iloc[:, [0,9,2,3,4,7,5,8]].to_csv(outfile, sep='\t')
     logging.info('DeepSignal traite saved')
 
-
 def getMerged(infile1, infile2, outfile):
+    """ Function that will merge your formatted file with the reference file provided by pos.py ."""
     nrow, _ = subprocess.check_output(["wc", "-l", str(infile1)]).decode().split()
     logging.info("total rows of the reference: "+nrow)
     ref = pd.concat([chunk for chunk in tqdm(pd.read_csv(infile1, sep='\t', dtype={'Pos_Globale': str}, chunksize=5000), desc='Loading reference data', total=int(nrow)/5000)])
@@ -115,10 +118,14 @@ def getMerged(infile1, infile2, outfile):
     logging.info('Merged file saved')
 
 def getMergedPourcentage(infileref,infile2,outfile):  
+    """ Function that will merge your file and give you the most important informations."""
     ref = pd.read_csv(infileref, sep='\t', usecols=['Chr','Pos_Globale','ID'])
     autre= pd.read_csv(infile2, sep='\t', usecols=['Chr','Pos_Globale','ID','Pourcentage_de_methylation'])
     a=ref.merge(autre, how='left', on=['Chr','Pos_Globale','ID'])
     a.to_csv(outfile, sep='\t', index=False)
+
+
+#Script/pipeline functions
 
 @print_info
 def analyseBathMet2(input, ref):
@@ -140,7 +147,6 @@ def analyseDeepSignalPlant(input, ref):
     getDeepSignal(input, input.parent /(input.stem+"Traite.txt"))
     getMerged(ref, input.parent /(input.stem+"Traite.txt"), input.parent /(input.stem+"Merged.txt"))
 
-
 def check_args(args):
     if args.bathmet2 and not args.bathmet2.exists():
         logging.warning("BathMet2 input does not exist. Please give a valid file.")
@@ -156,13 +162,10 @@ def check_args(args):
         exit() 
 
 
-
 if __name__ == '__main__':
     check_args(args)
     logging.basicConfig(filename='myappdata.log', filemode='w', format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S', level=args.loglevel)
     logging.info('Started')
-    getMerged('/Volumes/DATA/GitHub/Stage_2022/ReferencePosC.txt','/Volumes/DATA/GitHub/DptoBmTraite.txt','DPtoBmMerged.txt')
-
 
     if args.bathmet2:
         analyseBathMet2(args.bathmet2, args.reference)
