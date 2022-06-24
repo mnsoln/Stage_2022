@@ -2,7 +2,7 @@
 
 Mes scripts de mon stage volontaire à l'IBMP. / My scripts from my internship at IBMP.
 
-**Theme :** Analyse des données de séquençage d'A. thaliana. Mise en place d'un pipeline en python pour la détection des niveaux de méthylation. Analyse graphique des données sur R.
+**Theme :** ***Analyse des données de séquençage d'A. thaliana. Mise en place d'un pipeline en python pour la détection des niveaux de méthylation. Analyse graphique des données sur R.***
 
 
 ## Installation
@@ -18,14 +18,18 @@ https://drive.google.com/file/d/1euW_eSfDgnDULG62Csubbuf5YOSQ8eeX/view?usp=shari
 
 Uses argparse for arguments.
 
-Exemple :
+*Exemple :*
 
-```  python3.9 pos.py --fasta /exemple/test/fasta.fasta --gff /exemple/test/genes_transposons.gff ```
+``` python3.9 pos.py --fasta /exemple/test/fasta.fasta --gff /exemple/test/genes_transposons.gff ```
 
-``` data.py --reference /exemple/test/ReferencePosC.txt --bismark /exemple/test/bismark.CX_report.txt --debug ```
-
-
+``` python3.9 data.py --reference /exemple/test/ReferencePosC.txt --bismark /exemple/test/bismark.CX_report.txt --debug ```
 
 
 
 ## Resultats
+
+Pos.py : txt files
+
+Data.py : txt files
+
+Use the rmarkdown file to get graphs (the functions come from the R file). You can also get tables from the R file.
