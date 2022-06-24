@@ -6,4 +6,6 @@
 
 #python3.9 data.py --reference /Volumes/DATA/GitHub/Stage_2022/ReferencePosC.txt --bismark /Volumes/DATA/Bd05_1_val_1_bismark_hisat2_pe.deduplicated.CX_report.txt --debug
 
-python3.9 data.py --reference /Volumes/DATA/GitHub/Stage_2022/ReferencePosC.txt --bismark /Volumes/DATA/Bismark_from_Deepsignal/BD21_rep1.deepsignal_to_bismark.tsv --debug
+#python3.9 data.py --reference /Volumes/DATA/GitHub/Stage_2022/ReferencePosC.txt --bismark /Volumes/DATA/Bismark_from_Deepsignal/BD21_rep1.deepsignal_to_bismark.tsv --debug
+
+#python3.9 data.py -h 

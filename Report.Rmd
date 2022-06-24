@@ -65,7 +65,7 @@ barPlotparGene <- function(filelist, geneid, debug = F){
   if(length(geneid) > 1) {
     A <- A + facet_wrap(ID ~ Type, ncol = length(filelist), scales = "free")
   } else {
-    A <- A + facet_wrap(~Type, ncol = 1, scales = "free_x") +scale_color_manual(values = c("Cytosine"="orange"))
+    A <- A + facet_wrap(~Type, ncol = 1, scales = "free_x") +scale_color_manual(values = c("Cytosine"="#B47FAF"))
   } 
   A <- A + labs(color = "Position")
   A
@@ -164,7 +164,7 @@ barPlotparGene(filelist = listeT, c("AT1G01010", "AT1G38065", "AT5TE75660"))
 
 ```
 
-We can see with bars how methylated each cytosine of a single gene/other annotation is and its context with the color of the bar, this color being grey when we do not get the rate of methylation information. The coverage of the whole annotation is displayed by the black line. The positions of the cytosines are displayed by the purple dots and the black dots show the cytosines not covered.
+We can see with bars how methylated each cytosine of a single annotation (id) is and its context with the color of the bar, this color being grey when we do not get the rate of methylation information. The coverage of the whole annotation is displayed by the black line. The positions of the cytosines are displayed by the purple dots and the black dots show the cytosines not covered.
 
 Here is the code:
 
