@@ -14,7 +14,7 @@ Mes scripts de mon stage volontaire à l'IBMP. / My scripts from my internship a
 
 ## Description
 
-https://drive.google.com/file/d/1euW_eSfDgnDULG62Csubbuf5YOSQ8eeX/view?usp=sharing
+Diagramme explicatif : https://drive.google.com/file/d/1euW_eSfDgnDULG62Csubbuf5YOSQ8eeX/view?usp=sharing
 
 Uses argparse for arguments.
 
