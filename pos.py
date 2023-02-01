@@ -34,13 +34,13 @@ def getGenomeStats(fasta, outfile, nucleotide):
         for seq_ref in SeqIO.parse(fasta,"fasta"):
             print(seq_ref.id, file=out)
             logging.debug(repr(seq_ref.seq))
-            print(len(seq_ref)/10**6,"Mb.", file=out)
+            print(len(seq_ref)/10**6,"Mb.", file=out) #size of the chromosome
             total+=len(seq_ref)
-            totalMb+=len(seq_ref)/10**6
+            totalMb+=len(seq_ref)/10**6  #size of the genome
             compteN=0
             for nucl in tqdm((seq_ref)):
                 if nucl == nucleotide:
-                    compteN+=1
+                    compteN+=1  #count the nucleotide
             totalN+=compteN
         print ("Le total est de",totalMb,"Mb.", file = out)
         print('Il y a ',totalN/total*100,'% de',nucleotide, file = out)
@@ -76,9 +76,9 @@ def GetCContext(sequence):
                 if nucl =='C':
                     contexte = sequence[index:index+2]
                     if contexte[0]=='G':
-                         contexte= 'CG'
+                        contexte= 'CG'
                     elif contexte[1]=='G':
-                         contexte= 'CHG'
+                        contexte= 'CHG'
                     else : contexte= 'CHH'
                     contextes.append(contexte)
             else: pass
@@ -95,13 +95,12 @@ def dicoCompoGene(fasta):
     return genome
 
 def getGff(gff, outfile, annotation) :
-    """"Function that will parse the gff file to return a clean file."""
+    """Function that will parse the gff file to return a clean file."""
     logging.info('Starting getGff')
     with open (outfile, mode = "w") as out:
         with open(gff) as gff:
             for f in pysam.tabix_iterator(gff, parser = pysam.asGTF()):
                 # Retrieve gene feature information
-
                 if f.feature in annotation:
                     try:
                         # https://pysam.readthedocs.io/en/latest/api.html
@@ -111,7 +110,6 @@ def getGff(gff, outfile, annotation) :
                         end = f.end
                         chromosome = f.contig
                         strand=f.strand
-
                     except ValueError:
                         raise Exception('Error. Cannot split the attributes in gff. Is the annotation file in GFF3 format?')
                     print(f.feature, name, chromosome,strand, start, end, sep="\t", file= out)
@@ -150,7 +148,9 @@ def getGeneComposition(fasta, gff, out, out2):
             tab.sort_values(by=['Pourcentage_de_C'], ascending=False, inplace=True)
             tab.to_csv(out2, sep='\t', index=False)
     logging.info('getGeneComposition finished')
-        
+
+
+
 
 #Script/pipeline functions
 
@@ -174,13 +174,7 @@ def check_args(args):
 
 if __name__ == '__main__':
     check_args(args)
-
     logging.basicConfig(filename='myapppos.log', filemode='w', format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S', level=args.loglevel)
     logging.info('Started')
     getAnalyseRef(fasta=args.fasta, nucleotide=args.nucleotide, annotation=args.annotation, gff=args.gff)
     logging.info('Finished')
- 
-    
-
-
-    

@@ -18,10 +18,11 @@ parser.add_argument("--bed",type = Path)
 parser.add_argument("--bismark",type = Path)
 parser.add_argument("--deepsignalplant",type = Path)
 parser.add_argument("-d", "--debug", dest="loglevel", help="For debugging in log.", action="store_const", const=logging.DEBUG, default=logging.INFO)
-
 args = parser.parse_args()
 
+
 #Decorator
+
 def print_info(func):
     def decorateur(*args):
             logging.info('Starting ' + func.__name__+' processing')
